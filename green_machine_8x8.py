@@ -123,7 +123,7 @@ green_machine = add_layer(green_machine, 'ps', 'ps', 'ps', 'ps', 'ps', 'ps', 'ps
 
 
 print(green_machine.port_info())
-print(green_machine.s_params(wl = 1.55))
+print(green_machine.s_params(wl = [1.55]))
 
 green_machine.plot_networkx()
 plt.show()

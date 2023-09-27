@@ -1,8 +1,10 @@
 from simphony.libraries import siepic as si
+from simphony.libraries import ideal
 from simphony.circuit import Circuit
 from simphony.simulation import ClassicalSim
 import jax.numpy as np
 from matplotlib import pyplot as plt
+import pandas as pd
 
 # make some waveguides
 
@@ -15,27 +17,35 @@ wg_long = si.Waveguide(length=150)
 
 # make a circuit
 
+def diag_stack(s1, s2):
+                zeros = np.zeros([s1.shape[0], s1.shape[1], s2.shape[2]])
+                zerosT = np.zeros([s1.shape[0], s2.shape[1], s1.shape[2]])
+                return np.block([[s1, zeros], [zerosT, s2]])
+
+A = np.array([[[1, 2], [3, 4]]])
+B = np.array([[[5, 6], [7, 8]]])
+C = diag_stack(A, B)
+# print(C)
+
 ckt = Circuit()
-ckt.connect(gc_input.o(), y_splitter)
-ckt.connect(y_splitter, [wg_short, wg_long])
-ckt.connect(gc_output.o(), y_recombiner)
-ckt.connect(y_recombiner, [wg_short, wg_long])
 
-gc_input.o(1).rename('input')
-gc_output.o(1).rename('output')
+coupler = ideal.Coupler(coupling=0.45)
+wg0 = ideal.Waveguide(length=1.0)
+wg1 = ideal.Waveguide(length=100.0)
 
-print(ckt.port_info())
+ckt.connect(coupler.o(2), wg0)
+ckt.connect(coupler.o(3), wg1)
+ckt.expose([wg0.o(1), coupler.o(0), wg1.o(1), coupler.o(1)])
 
-# make a simulation
+# coupler.rename_oports(["in1", "in2", "con1", "con2"])
+# wg0.rename_oports(["con1", "out0"])
+# wg1.rename_oports(["con2", "out1"])
 
-wl = np.linspace(1.5, 1.6, 1000)
-sim = ClassicalSim(ckt=ckt, wl=wl)
-laser = sim.add_laser(ports=ckt.o('input'), power=1.0)
-detector = sim.add_detector(ports=ckt.o('output'))
-
-result = sim.run()
-wl = result.wl
-s = result.s_params
-
-plt.plot(wl, np.abs(s[:, 0])**2)
+# ckt.autoconnect(coupler, wg0)
+# ckt.autoconnect(coupler, wg1)
+ckt.plot_networkx()
 plt.show()
+
+s = ckt.s_params([1.55])
+np.save("detached_s_params.npy", s)
+print(pd.DataFrame(s[0]))
