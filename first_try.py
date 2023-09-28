@@ -33,9 +33,13 @@ coupler = ideal.Coupler(coupling=0.45)
 wg0 = ideal.Waveguide(length=1.0)
 wg1 = ideal.Waveguide(length=100.0)
 
-ckt.connect(coupler.o(2), wg0)
-ckt.connect(coupler.o(3), wg1)
-ckt.expose([wg0.o(1), coupler.o(0), wg1.o(1), coupler.o(1)])
+# ckt.connect(coupler.o(2), wg0)
+# ckt.connect(coupler.o(3), wg1)
+# ckt.expose([wg0.o(1), coupler.o(0), wg1.o(1), coupler.o(1)])
+
+ckt.add(coupler)
+ckt.add(wg0)   
+ckt.add(wg1)
 
 # coupler.rename_oports(["in1", "in2", "con1", "con2"])
 # wg0.rename_oports(["con1", "out0"])
@@ -43,8 +47,8 @@ ckt.expose([wg0.o(1), coupler.o(0), wg1.o(1), coupler.o(1)])
 
 # ckt.autoconnect(coupler, wg0)
 # ckt.autoconnect(coupler, wg1)
-ckt.plot_networkx()
-plt.show()
+# ckt.plot_networkx()
+# plt.show()
 
 s = ckt.s_params([1.55])
 np.save("detached_s_params.npy", s)
