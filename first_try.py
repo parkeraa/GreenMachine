@@ -1,55 +1,54 @@
-from simphony.libraries import siepic as si
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import sax
 from simphony.libraries import ideal
-from simphony.circuit import Circuit
-from simphony.simulation import ClassicalSim
-import jax.numpy as np
-from matplotlib import pyplot as plt
-import pandas as pd
 
-# make some waveguides
 
-gc_input = si.GratingCoupler()
-gc_output = si.GratingCoupler()
-y_splitter = si.YBranch()
-y_recombiner = si.YBranch()
-wg_short = si.Waveguide(length=50)
-wg_long = si.Waveguide(length=150)
+# make some waveguide
 
-# make a circuit
 
-def diag_stack(s1, s2):
-                zeros = np.zeros([s1.shape[0], s1.shape[1], s2.shape[2]])
-                zerosT = np.zeros([s1.shape[0], s2.shape[1], s1.shape[2]])
-                return np.block([[s1, zeros], [zerosT, s2]])
 
-A = np.array([[[1, 2], [3, 4]]])
-B = np.array([[[5, 6], [7, 8]]])
-C = diag_stack(A, B)
-# print(C)
+ckt, info = sax.circuit(
+    netlist = {
+        "instances" : {
+            "wg_in" : "wg",
+            "wg_out" : "wg",
+            "wg_top" : "wg",
+            "wg_bot" : "wg",
+            "splitter" : "coupler",
+            "combiner" : "coupler",
+            },
+        "connections" : {
+            "wg_in,o1" : "splitter,o0",
+            "splitter,o1" : "wg_bot,o0",
+            "splitter,o3" : "wg_top,o0",
+            "wg_top,o1" : "combiner,o2",
+            "wg_bot,o1" : "combiner,o0",
+            "wg_out,o0" : "combiner,o1",
+        },
+        "ports" : {
+            "in" : "wg_in,o0",
+            "out" : "wg_out,o1",
 
-ckt = Circuit()
+        }
+        },
+    models = {
+        "wg" : ideal.waveguide,
+        "coupler" : ideal.coupler,
+        }
+)
 
-coupler = ideal.Coupler(coupling=0.45)
-wg0 = ideal.Waveguide(length=1.0)
-wg1 = ideal.Waveguide(length=100.0)
 
-# ckt.connect(coupler.o(2), wg0)
-# ckt.connect(coupler.o(3), wg1)
-# ckt.expose([wg0.o(1), coupler.o(0), wg1.o(1), coupler.o(1)])
+wl = jnp.linspace(1.5, 1.6, 1000)
+s_params = ckt(wl=wl, wg_top = {"length":10}, wg_bot = {"length":20})
 
-ckt.add(coupler)
-ckt.add(wg0)   
-ckt.add(wg1)
+mag = jnp.abs(s_params["out", "in"])**2
 
-# coupler.rename_oports(["in1", "in2", "con1", "con2"])
-# wg0.rename_oports(["con1", "out0"])
-# wg1.rename_oports(["con2", "out1"])
-
-# ckt.autoconnect(coupler, wg0)
-# ckt.autoconnect(coupler, wg1)
-# ckt.plot_networkx()
-# plt.show()
-
-s = ckt.s_params([1.55])
-np.save("detached_s_params.npy", s)
-print(pd.DataFrame(s[0]))
+fig, axs = plt.subplots(2, 1, sharex=True)
+axs[0].plot(wl, mag)
+axs[0].set_ylabel("Transmission")
+axs[1].plot(wl, 10*jnp.log10(mag))
+axs[1].set_ylabel("Transmission (dB)")
+axs[1].set_xlabel("Wavelength (um)")
+plt.suptitle("MZI Response")
+plt.show()
