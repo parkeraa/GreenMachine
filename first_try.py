@@ -6,49 +6,98 @@ from simphony.libraries import ideal
 
 # make some waveguide
 
+# factory to build individual layers
 
+def routing_wg(wl):
+    return ideal.waveguide(wl=wl)
 
-ckt, info = sax.circuit(
-    netlist = {
-        "instances" : {
-            "wg_in" : "wg",
-            "wg_out" : "wg",
-            "wg_top" : "wg",
-            "wg_bot" : "wg",
-            "splitter" : "coupler",
-            "combiner" : "coupler",
+def crossover_wg(wl, device):
+    return ideal.waveguide(wl=wl)
+
+def beamsplitter(wl, device):
+    return ideal.coupler(wl=wl)
+
+def crossover(wl, device):
+    return ideal.coupler(wl=wl, coupling=1)
+
+def edge_coupler(wl, device):
+    return ideal.coupler(wl=wl, coupling=0.5)
+
+def layer_factory(wl, components, device=0) -> sax.SDict:
+    """
+    makes a layer of the green machine. receives as inputs the components listed 
+    from row 0 to 7 and returns a circuit object with the components added and the 
+    ports renamed. No connections are made within a layer
+
+    @param components: a list of components to be added to the circuit. List as
+    strings in the order of the ports. 
+        "wg" - waveguide
+        "ps" - phase shifter
+        "bs" - beam splitter
+        "x"  - crossover
+        "ec" - edge coupler
+    """
+
+    # first we will make the dictionaries to be used in the netlist
+    
+    inst = {}
+    ports = {}
+    row = 0
+    for comp in components:
+        if comp == "wg":
+            inst[f'wg_{row}'] = comp
+            ports[f'in_{row}'] = f'wg_{row},o0'
+            ports[f'out_{row}'] = f'wg_{row},o1'
+            row += 1
+        if comp == 'xwg':
+            inst[f'xwg_{row}'] = comp
+            ports[f'in_{row}'] = f'xwg_{row},o0'
+            ports[f'out_{row}'] = f'xwg_{row},o1'
+            row += 1
+        if comp == "bs":
+            inst[f'bs_{row}{row+1}'] = comp
+            ports[f'in_{row}'] = f'bs_{row}{row+1},o0'
+            ports[f'out_{row}'] = f'bs_{row}{row+1},o1'
+            ports[f'in_{row+1}'] = f'bs_{row}{row+1},o2'
+            ports[f'out_{row+1}'] = f'bs_{row}{row+1},o3'
+            row += 2
+        if comp == "x":
+            inst[f'x_{row}{row+1}'] = comp
+            ports[f'in_{row}'] = f'x_{row}{row+1},o0'
+            ports[f'out_{row}'] = f'x_{row}{row+1},o1'
+            ports[f'in_{row+1}'] = f'x_{row}{row+1},o2'
+            ports[f'out_{row+1}'] = f'x_{row}{row+1},o3'
+            row += 2
+        if comp == "ec":
+            inst[f'ec_{row}'] = comp
+            ports[f'in_{row}'] = f'ec_{row},o0'
+            row += 1
+    print(inst)
+    print(ports)
+
+    layer, _ = sax.circuit(
+            netlist = {
+                "instances" : inst,
+                'connections' : {},
+                'ports' : ports,
             },
-        "connections" : {
-            "wg_in,o1" : "splitter,o0",
-            "splitter,o1" : "wg_bot,o0",
-            "splitter,o3" : "wg_top,o0",
-            "wg_top,o1" : "combiner,o2",
-            "wg_bot,o1" : "combiner,o0",
-            "wg_out,o0" : "combiner,o1",
-        },
-        "ports" : {
-            "in" : "wg_in,o0",
-            "out" : "wg_out,o1",
+            models = {
+                'wg': routing_wg,
+                # 'xwg': crossover_wg,
+                # 'bs' : beamsplitter,
+                # 'x' : crossover,
+                # 'ec' : edge_coupler,
 
-        }
-        },
-    models = {
-        "wg" : ideal.waveguide,
-        "coupler" : ideal.coupler,
-        }
-)
+            }
+    )
+    return layer(wl=wl)
 
 
-wl = jnp.linspace(1.5, 1.6, 1000)
-s_params = ckt(wl=wl, wg_top = {"length":10}, wg_bot = {"length":20})
 
-mag = jnp.abs(s_params["out", "in"])**2
+routing_comps = ('wg', 'wg', 'wg', 'wg', 'wg', 'wg', 'wg', 'wg')
 
-fig, axs = plt.subplots(2, 1, sharex=True)
-axs[0].plot(wl, mag)
-axs[0].set_ylabel("Transmission")
-axs[1].plot(wl, 10*jnp.log10(mag))
-axs[1].set_ylabel("Transmission (dB)")
-axs[1].set_xlabel("Wavelength (um)")
-plt.suptitle("MZI Response")
-plt.show()
+# for comp in routing_comps:
+    # print(comp)
+    # print(comp == 'wg')
+s = layer_factory(1.55, routing_comps)
+# s
